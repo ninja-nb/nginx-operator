@@ -55,5 +55,6 @@ tmp/
 # Microsoft Office temporary lock files
 ~$*
 
-# Project documentation
-docs/
+# Project documentation (track one curated design Q&A doc)
+docs/*
+!docs/operator-design-qna.md
