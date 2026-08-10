@@ -51,3 +51,6 @@ tmp/
 
 # Logs
 *.log
+
+# Microsoft Office temporary lock files
+~$*
