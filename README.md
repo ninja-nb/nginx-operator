@@ -1,121 +1,171 @@
 # nginx-operator
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+`nginx-operator` is a Kubernetes Operator built with Kubebuilder.  
+It manages a custom resource named `NginxCluster` (`platform.example.com/v1`) and reconciles each instance into:
 
-## Getting Started
+- one `Deployment` running `nginx:1.27`
+- one `Service` of type `ClusterIP`
 
-### Prerequisites
-- go version v1.24.6+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+The custom resource currently lets you set desired replica count via `spec.replicas`, and the operator reports observed readiness via `status.readyReplicas`.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+## How It Works
+
+When an `NginxCluster` is created or updated, the controller:
+
+1. reads the desired state (`spec.replicas`)
+2. creates or updates a same-name `Deployment` in the same namespace
+3. creates or updates a same-name `Service` exposing port `80`
+4. sets owner references so child resources are garbage-collected with the CR
+5. updates `status.readyReplicas` from the `Deployment` status
+
+The controller watches:
+
+- `NginxCluster` resources directly
+- owned `Deployment` resources
+- owned `Service` resources
+
+## Repository Layout
+
+- `api/v1/`: CRD Go types for `NginxCluster`
+- `internal/controller/`: reconciliation logic
+- `config/crd/`: generated CRD manifests
+- `config/rbac/`: generated RBAC manifests
+- `config/manager/`: controller manager deployment manifest
+- `config/samples/`: sample custom resources
+- `test/`: unit and e2e tests
+
+## Prerequisites
+
+- Go `1.24+`
+- Docker
+- `kubectl`
+- Access to a Kubernetes cluster
+- For e2e tests: [Kind](https://kind.sigs.k8s.io/)
+
+## Quick Start (Local Development)
+
+### 1) Run tests
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/nginx-operator:tag
+make test
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+### 2) Run controller locally against your current kubeconfig context
 
-**Install the CRDs into the cluster:**
+```sh
+make run
+```
+
+### 3) Apply sample custom resource
+
+```sh
+kubectl apply -f config/samples/platform_v1_nginxcluster.yaml
+```
+
+### 4) Verify resources
+
+```sh
+kubectl get nginxclusters.platform.example.com
+kubectl get deploy,svc
+```
+
+## Build and Deploy to a Cluster
+
+### Build and push an image
+
+```sh
+make docker-build docker-push IMG=<registry>/nginx-operator:<tag>
+```
+
+### Install CRDs
 
 ```sh
 make install
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+### Deploy controller manager
 
 ```sh
-make deploy IMG=<some-registry>/nginx-operator:tag
+make deploy IMG=<registry>/nginx-operator:<tag>
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+### Create a sample `NginxCluster`
 
 ```sh
-kubectl apply -k config/samples/
+kubectl apply -f config/samples/platform_v1_nginxcluster.yaml
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+## Uninstall
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+### Delete sample resources
 
 ```sh
-kubectl delete -k config/samples/
+kubectl delete -f config/samples/platform_v1_nginxcluster.yaml
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
+### Undeploy controller manager
 
 ```sh
 make undeploy
 ```
 
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
+### Remove CRDs
 
 ```sh
-make build-installer IMG=<some-registry>/nginx-operator:tag
+make uninstall
 ```
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
+## Useful Make Targets
 
-2. Using the installer
+- `make help`: list all targets
+- `make manifests`: regenerate CRD/RBAC manifests
+- `make generate`: regenerate DeepCopy code
+- `make lint`: run linter
+- `make lint-fix`: auto-fix lint issues
+- `make test`: run unit/integration tests (non-e2e)
+- `make test-e2e`: run e2e tests using a dedicated Kind cluster
+- `make build-installer IMG=<registry>/nginx-operator:<tag>`: generate `dist/install.yaml`
 
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
+## Distribution
+
+### YAML bundle
+
+Generate a single install manifest:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/nginx-operator/<tag or branch>/dist/install.yaml
+make build-installer IMG=<registry>/nginx-operator:<tag>
 ```
 
-### By providing a Helm Chart
+This creates `dist/install.yaml`, which can be published and installed with:
 
-1. Build the chart using the optional helm plugin
+```sh
+kubectl apply -f https://raw.githubusercontent.com/<org>/<repo>/<ref>/dist/install.yaml
+```
+
+### Helm chart (optional)
+
+Helm support can be scaffolded with:
 
 ```sh
 kubebuilder edit --plugins=helm/v2-alpha
 ```
 
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
+## Notes for Contributors
 
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
+- Do not manually edit generated files under `config/crd/bases/`, `config/rbac/role.yaml`, or `zz_generated.*.go`.
+- After changing API types (`api/v1/*_types.go`), run:
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+```sh
+make manifests
+make generate
+```
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
+- After changing Go logic, run:
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+```sh
+make lint-fix
+make test
+```
 
 ## License
 
@@ -123,13 +173,7 @@ Copyright 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+You may obtain a copy of the License at:
 
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+http://www.apache.org/licenses/LICENSE-2.0
 
