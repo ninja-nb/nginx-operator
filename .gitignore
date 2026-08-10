@@ -54,3 +54,6 @@ tmp/
 
 # Microsoft Office temporary lock files
 ~$*
+
+# Project documentation
+docs/
