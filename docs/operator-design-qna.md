@@ -4,6 +4,46 @@ This version is intentionally direct: each question has a short answer first, th
 
 ## Straight Answers
 
+### Q0: If a CR spec change takes 10+ minutes to take effect, what all should we look for?
+**Answer:** Treat this as a control-loop latency issue and debug in layers: trigger, controller, child resources, and cluster/runtime.
+
+**What to check first (in order)**
+1. **Trigger and pickup**
+   - Did `metadata.generation` increment after spec change?
+   - Did controller logs show reconcile for that CR/generation?
+2. **Status progression**
+   - Is `status.readyReplicas` changing?
+   - Are `Available` / `Progressing` / `Degraded` conditions moving?
+3. **Child resource rollout**
+   - Deployment desired vs ready replicas.
+   - Pod states (`Pending`, `ImagePullBackOff`, probe failures, scheduling/quotas).
+4. **Controller health/performance**
+   - Reconcile errors, status update conflicts, retry/backoff loops.
+5. **Platform bottlenecks**
+   - RBAC denials, API throttling, webhook delays, node pressure.
+
+**Commands I would ask the team to run**
+```bash
+# CR and status/conditions
+kubectl get nginxcluster <name> -n <namespace> -o yaml
+kubectl describe nginxcluster <name> -n <namespace>
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.metadata.generation}{"\n"}{.status.readyReplicas}{"\n"}'
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
+
+# Child resources and pods
+kubectl get deploy <name> -n <namespace> -o wide
+kubectl describe deploy <name> -n <namespace>
+kubectl get pods -n <namespace> -l app=<name>
+kubectl describe pod <pod-name> -n <namespace>
+
+# Operator logs and events
+kubectl logs -n nginx-operator-system deployment/nginx-operator-controller-manager -c manager --since=15m
+kubectl get events -n <namespace> --sort-by=.metadata.creationTimestamp
+```
+
+**Interview design point**
+- In production, define an SLO (for example, spec-change-to-ready under 10 minutes), expose reconcile latency metrics, and set a timeout condition/event (`ReconcileTimeout`) when the SLO is breached.
+
 ### Q1: What does this operator do?
 **Answer:** For each `NginxCluster`, it reconciles one `Deployment` and one `Service` (both with the same name as the CR, in the same namespace).
 
