@@ -1,10 +1,8 @@
-# NGINX Operator Design Q&A (Deepak)
+# NGINX Operator Design Q&A 
 
-This version is intentionally direct: each question has a short answer first, then how to verify.
+This document gas all questions with a short answer first, then how to verify.
 
-## Straight Answers
-
-### Q0: If a CR spec change takes 10+ minutes to take effect, what all should we look for?
+### Q1: If a CR spec change takes 10+ minutes to take effect, what all should we look for?
 **Answer:** Treat this as a control-loop latency issue and debug in layers: trigger, controller, child resources, and cluster/runtime.
 
 **What to check first (in order)**
@@ -44,7 +42,7 @@ kubectl get events -n <namespace> --sort-by=.metadata.creationTimestamp
 **Interview design point**
 - In production, define an SLO (for example, spec-change-to-ready under 10 minutes), expose reconcile latency metrics, and set a timeout condition/event (`ReconcileTimeout`) when the SLO is breached.
 
-### Q1: What does this operator do?
+### Q12 What does this operator do?
 **Answer:** For each `NginxCluster`, it reconciles one `Deployment` and one `Service` (both with the same name as the CR, in the same namespace).
 
 **How to verify**
@@ -54,7 +52,7 @@ kubectl get deploy <name> -n <namespace>
 kubectl get svc <name> -n <namespace>
 ```
 
-### Q2: How does scaling work?
+### Q3: How does scaling work?
 **Answer:** `NginxCluster.spec.replicas` is copied to `Deployment.spec.replicas`.
 
 **How to verify**
@@ -63,7 +61,7 @@ kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.spec.replicas}{"\n
 kubectl get deploy <name> -n <namespace> -o jsonpath='{.spec.replicas}{"\n"}'
 ```
 
-### Q3: Which nginx image runs?
+### Q4: Which nginx image runs?
 **Answer:** The controller currently sets image to `nginx:1.27` (hardcoded).
 
 **How to verify**
@@ -71,7 +69,7 @@ kubectl get deploy <name> -n <namespace> -o jsonpath='{.spec.replicas}{"\n"}'
 kubectl get deploy <name> -n <namespace> -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
-### Q4: How are resources cleaned up when CR is deleted?
+### Q5: How are resources cleaned up when CR is deleted?
 **Answer:** `Deployment` and `Service` are owner-referenced to `NginxCluster`, so Kubernetes garbage collection removes them.
 
 **How to verify**
@@ -80,7 +78,7 @@ kubectl get deploy <name> -n <namespace> -o yaml | rg ownerReferences -n
 kubectl get svc <name> -n <namespace> -o yaml | rg ownerReferences -n
 ```
 
-### Q5: What status does operator update?
+### Q6: What status does operator update?
 **Answer:** It updates:
 
 - `status.readyReplicas` from `Deployment.status.readyReplicas`
@@ -97,7 +95,7 @@ kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[
 kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[*].status}{"\n"}'
 ```
 
-### Q5.1: What happens when `spec.replicas=0`?
+### Q7: What happens when `spec.replicas=0`?
 **Answer:** Current logic marks `Available=False` when desired replicas are `0`, even if `readyReplicas=0`.  
 This is expected from current implementation (`desiredReplicas > 0` is required for `Available=True`).
 
@@ -108,7 +106,7 @@ kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[
 kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}{"\n"}'
 ```
 
-### Q6: What triggers reconciliation?
+### Q8: What triggers reconciliation?
 **Answer:** Changes to `NginxCluster`, and changes to owned `Deployment`/`Service`.
 
 **How to verify**
