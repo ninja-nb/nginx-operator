@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +40,12 @@ type NginxClusterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+const (
+	conditionAvailable   = "Available"
+	conditionProgressing = "Progressing"
+	conditionDegraded    = "Degraded"
+)
 
 // +kubebuilder:rbac:groups=platform.example.com,resources=nginxclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=platform.example.com,resources=nginxclusters/status,verbs=get;update;patch
@@ -81,7 +88,7 @@ func (r *NginxClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		deployment.Spec.Selector = &metav1.LabelSelector{
 			MatchLabels: labels,
 		}
-		deployment.Spec.Template.ObjectMeta.Labels = labels
+		deployment.Spec.Template.Labels = labels
 		deployment.Spec.Replicas = &nginxCluster.Spec.Replicas
 		deployment.Spec.Template.Spec.Containers = []corev1.Container{
 			{
@@ -152,12 +159,59 @@ func (r *NginxClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if nginxCluster.Status.ReadyReplicas != deployment.Status.ReadyReplicas {
-		nginxCluster.Status.ReadyReplicas = deployment.Status.ReadyReplicas
-		if err := r.Status().Update(ctx, nginxCluster); err != nil {
-			log.Error(err, "Could not update NginxCluster status", "name", nginxCluster.Name)
-			return ctrl.Result{}, err
-		}
+	if err := r.Get(ctx, req.NamespacedName, deployment); err != nil {
+		log.Error(err, "Could not fetch Deployment for status update", "name", deployment.Name)
+		return ctrl.Result{}, err
+	}
+
+	desiredReplicas := nginxCluster.Spec.Replicas
+	readyReplicas := deployment.Status.ReadyReplicas
+
+	nginxCluster.Status.ReadyReplicas = readyReplicas
+	available := readyReplicas == desiredReplicas && desiredReplicas > 0
+
+	if available {
+		apimeta.SetStatusCondition(&nginxCluster.Status.Conditions, metav1.Condition{
+			Type:               conditionAvailable,
+			Status:             metav1.ConditionTrue,
+			Reason:             "DesiredReplicasReady",
+			Message:            "Desired number of replicas is ready",
+			ObservedGeneration: nginxCluster.Generation,
+		})
+		apimeta.SetStatusCondition(&nginxCluster.Status.Conditions, metav1.Condition{
+			Type:               conditionProgressing,
+			Status:             metav1.ConditionFalse,
+			Reason:             "DesiredStateReached",
+			Message:            "Reconciliation reached the desired state",
+			ObservedGeneration: nginxCluster.Generation,
+		})
+	} else {
+		apimeta.SetStatusCondition(&nginxCluster.Status.Conditions, metav1.Condition{
+			Type:               conditionAvailable,
+			Status:             metav1.ConditionFalse,
+			Reason:             "ReplicasNotReady",
+			Message:            "Waiting for pods to become ready",
+			ObservedGeneration: nginxCluster.Generation,
+		})
+		apimeta.SetStatusCondition(&nginxCluster.Status.Conditions, metav1.Condition{
+			Type:               conditionProgressing,
+			Status:             metav1.ConditionTrue,
+			Reason:             "Reconciling",
+			Message:            "Resources are being reconciled",
+			ObservedGeneration: nginxCluster.Generation,
+		})
+	}
+	apimeta.SetStatusCondition(&nginxCluster.Status.Conditions, metav1.Condition{
+		Type:               conditionDegraded,
+		Status:             metav1.ConditionFalse,
+		Reason:             "AsExpected",
+		Message:            "No degraded condition detected",
+		ObservedGeneration: nginxCluster.Generation,
+	})
+
+	if err := r.Status().Update(ctx, nginxCluster); err != nil {
+		log.Error(err, "Could not update NginxCluster status", "name", nginxCluster.Name)
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

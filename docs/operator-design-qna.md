@@ -1,159 +1,175 @@
-# NGINX Operator Design Q&A
+# NGINX Operator Design Q&A (Deepak)
 
-This document captures common design questions, the current behavior of the operator, and a practical investigation workflow for debugging issues.
+This version is intentionally direct: each question has a short answer first, then how to verify.
 
-## Key Questions and Answers
+## Straight Answers
 
-### 1) What does this operator create from a `NginxCluster` custom resource?
+### Q1: What does this operator do?
+**Answer:** For each `NginxCluster`, it reconciles one `Deployment` and one `Service` (both with the same name as the CR, in the same namespace).
 
-For each `NginxCluster`, the controller reconciles:
+**How to verify**
+```bash
+kubectl get nginxcluster <name> -n <namespace>
+kubectl get deploy <name> -n <namespace>
+kubectl get svc <name> -n <namespace>
+```
 
-- a `Deployment` named the same as the CR
-- a `Service` (`ClusterIP`) named the same as the CR
+### Q2: How does scaling work?
+**Answer:** `NginxCluster.spec.replicas` is copied to `Deployment.spec.replicas`.
 
-Both resources are created in the same namespace as the custom resource.
+**How to verify**
+```bash
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.spec.replicas}{"\n"}'
+kubectl get deploy <name> -n <namespace> -o jsonpath='{.spec.replicas}{"\n"}'
+```
 
-### 2) How is scale handled?
+### Q3: Which nginx image runs?
+**Answer:** The controller currently sets image to `nginx:1.27` (hardcoded).
 
-`spec.replicas` from `NginxCluster` is applied directly to `Deployment.spec.replicas`.
+**How to verify**
+```bash
+kubectl get deploy <name> -n <namespace> -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
 
-### 3) Which image is deployed?
+### Q4: How are resources cleaned up when CR is deleted?
+**Answer:** `Deployment` and `Service` are owner-referenced to `NginxCluster`, so Kubernetes garbage collection removes them.
 
-The managed pod runs `nginx:1.27` currently.
+**How to verify**
+```bash
+kubectl get deploy <name> -n <namespace> -o yaml | rg ownerReferences -n
+kubectl get svc <name> -n <namespace> -o yaml | rg ownerReferences -n
+```
 
-### 4) How is ownership and cleanup handled?
-
-The controller sets owner references from `Deployment` and `Service` to the `NginxCluster`.  
-When the CR is deleted, Kubernetes garbage collection can remove owned resources.
-
-### 5) What status is reported back to the custom resource?
-
-The controller updates:
+### Q5: What status does operator update?
+**Answer:** It updates:
 
 - `status.readyReplicas` from `Deployment.status.readyReplicas`
+- `status.conditions`:
+  - `Available`
+  - `Progressing`
+  - `Degraded`
 
-### 6) What resources/events trigger reconciliation?
+**How to verify**
+```bash
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.readyReplicas}{"\n"}'
+kubectl get deploy <name> -n <namespace> -o jsonpath='{.status.readyReplicas}{"\n"}'
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[*].type}{"\n"}'
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[*].status}{"\n"}'
+```
 
-The controller watches:
+### Q5.1: What happens when `spec.replicas=0`?
+**Answer:** Current logic marks `Available=False` when desired replicas are `0`, even if `readyReplicas=0`.  
+This is expected from current implementation (`desiredReplicas > 0` is required for `Available=True`).
 
-- `NginxCluster`
-- owned `Deployment`
-- owned `Service`
+**How to verify**
+```bash
+kubectl patch nginxcluster <name> -n <namespace> --type merge -p '{"spec":{"replicas":0}}'
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[?(@.type=="Available")].status}{"\n"}'
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}{"\n"}'
+```
 
-## Reconciliation Sequence Diagram
+### Q6: What triggers reconciliation?
+**Answer:** Changes to `NginxCluster`, and changes to owned `Deployment`/`Service`.
+
+**How to verify**
+- Update CR replicas and watch controller logs
+- Modify Deployment manually and confirm a reconcile loop runs
+
+## Sequence Diagram With Investigation Notes
 
 ```mermaid
 sequenceDiagram
-    participant U as User/Kubectl
-    participant APIS as Kubernetes API Server
-    participant C as NginxCluster Controller
+    title Reconcile flow and where to investigate
+    participant U as User/kubectl
+    participant A as API Server
+    participant C as Controller
     participant D as Deployment
     participant S as Service
 
-    U->>APIS: Apply NginxCluster (spec.replicas = N)
-    APIS-->>C: Reconcile request for NginxCluster
-    C->>APIS: GET NginxCluster
-    C->>APIS: CreateOrUpdate Deployment (replicas=N, image=nginx:1.27)
-    APIS-->>D: Persist desired Deployment spec
-    C->>APIS: CreateOrUpdate Service (ClusterIP, port 80)
-    APIS-->>S: Persist Service spec
-    C->>APIS: Update NginxCluster.status.readyReplicas
-    APIS-->>C: Status update acknowledged
+    U->>A: Apply or update NginxCluster
+    A-->>C: Reconcile event
+    Note over C: If this never happens, check controller pod health and watches
+
+    C->>A: GET NginxCluster
+    Note over C,A: If GET fails, check RBAC and namespace/name correctness
+
+    C->>A: CreateOrUpdate Deployment (replicas, image, labels)
+    A-->>D: Persist Deployment
+    Note over C,D: If not created/updated, inspect controller logs and RBAC for deployments
+
+    C->>A: CreateOrUpdate Service (selector, port 80)
+    A-->>S: Persist Service
+    Note over C,S: If traffic fails, verify Service selector equals Pod labels
+
+    C->>A: GET Deployment for latest status
+    Note over C,A: If this fails, status update cannot proceed
+
+    C->>A: Update NginxCluster.status.readyReplicas
+    Note over C,A: If status stale, check status subresource update errors and condition transitions
 ```
 
-## How to Investigate an Issue
+## Investigation Playbook (Fast Path)
 
-Use this checklist to debug reconcile or runtime issues quickly.
-
-### Step 1: Validate the custom resource
-
+### 1) Check CR and events first
 ```bash
-kubectl get nginxclusters.platform.example.com -A
 kubectl describe nginxcluster <name> -n <namespace>
 kubectl get nginxcluster <name> -n <namespace> -o yaml
 ```
+Look for:
+- wrong/missing `spec.replicas`
+- no `status.readyReplicas` updates
+- warning events
 
-Check:
-
-- `spec.replicas` value is set as expected
-- `status.readyReplicas` progression
-- warning events on the resource
-
-### Step 2: Inspect managed Deployment and Service
-
+### 2) Check managed resources
 ```bash
-kubectl get deploy <name> -n <namespace> -o wide
 kubectl describe deploy <name> -n <namespace>
 kubectl get svc <name> -n <namespace> -o yaml
 ```
+Look for:
+- Deployment desired vs ready mismatch
+- Service selector mismatch
 
-Check:
+### 2.1) Check computed conditions explicitly
+```bash
+kubectl get nginxcluster <name> -n <namespace> -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
+```
+Look for:
+- `Available=True` only when desired replicas are ready and desired > 0
+- `Progressing=True` while converging
+- `Degraded=False` in normal path
 
-- Deployment replica counts (desired/current/ready)
-- Pod template uses `nginx:1.27`
-- Service selector matches pod labels
-
-### Step 3: Inspect Pods for runtime failures
-
+### 3) Check Pods when ready replicas are low
 ```bash
 kubectl get pods -n <namespace> -l app=<name>
 kubectl describe pod <pod-name> -n <namespace>
 kubectl logs <pod-name> -n <namespace>
 ```
+Look for:
+- image pull errors
+- probe failures
+- scheduling/quotas
 
-Check:
-
-- image pull failures
-- scheduling/resource issues
-- readiness probe failures
-
-### Step 4: Inspect controller logs
-
-If deployed in cluster:
-
+### 4) Check controller logs
 ```bash
 kubectl logs -n nginx-operator-system deployment/nginx-operator-controller-manager -c manager -f
 ```
-
 If running locally:
-
 ```bash
 make run
 ```
+Look for:
+- reconcile errors for Deployment/Service create-update
+- status update conflicts/errors
 
-Then re-apply/update the CR and observe reconcile log lines and errors.
-
-### Step 5: Verify RBAC and CRD state
-
+### 5) Check RBAC and CRD
 ```bash
 kubectl auth can-i create deployments --as system:serviceaccount:nginx-operator-system:nginx-operator-controller-manager -n <namespace>
 kubectl get crd nginxclusters.platform.example.com
 ```
 
-Check:
+## Quick Symptom -> Cause Map
 
-- controller service account has required permissions
-- CRD is installed and up-to-date
-
-### Step 6: Reproduce with tests
-
-```bash
-make test
-make test-e2e
-```
-
-Use unit/integration tests first, then e2e in an isolated Kind cluster for full flow validation.
-
-## Common Failure Patterns
-
-- CR exists, but no child resources -> controller not running, RBAC failure, or watch setup issue
-- Deployment created, but not ready -> image pull, readiness probe, scheduling, or quota issues
-- Service exists, but no traffic -> label/selector mismatch or pod readiness not reached
-- Status not updating -> status update conflict/error or stale reconcile object
-
-## Suggested Next Enhancements
-
-- Add `metav1.Condition` updates (Ready/Progressing/Degraded) for richer status
-- Make image configurable in `spec` instead of hardcoded `nginx:1.27`
-- Add explicit Events for create/update/error transitions
-- Add failure-oriented tests for reconcile error paths
+- **CR present, no Deployment/Service** -> controller not running, watch not firing, or RBAC denied
+- **Deployment exists, not ready** -> image/probe/scheduling issues
+- **Service exists, app unreachable** -> selector-label mismatch or pods not ready
+- **Status not changing** -> status update failing or reconcile not re-triggering

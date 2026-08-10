@@ -21,8 +21,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,16 +58,20 @@ var _ = Describe("NginxCluster Controller", func() {
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: platformv1.NginxClusterSpec{
+						Replicas: 2,
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &platformv1.NginxCluster{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			if err != nil && errors.IsNotFound(err) {
+				return
+			}
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Cleanup the specific resource instance NginxCluster")
@@ -80,8 +88,37 @@ var _ = Describe("NginxCluster Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			By("Verifying deployment was created with desired spec")
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, deployment)).To(Succeed())
+			Expect(deployment.Spec.Replicas).NotTo(BeNil())
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(2)))
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("nginx:1.27"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).NotTo(BeNil())
+
+			By("Verifying service was created with desired port")
+			service := &corev1.Service{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, service)).To(Succeed())
+			Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+			Expect(service.Spec.Ports).To(HaveLen(1))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(80)))
+			Expect(service.Spec.Ports[0].TargetPort).To(Equal(intstr.FromInt(80)))
+
+			By("Verifying owner references are set for garbage collection")
+			Expect(deployment.OwnerReferences).NotTo(BeEmpty())
+			Expect(service.OwnerReferences).NotTo(BeEmpty())
+			Expect(deployment.OwnerReferences[0].Kind).To(Equal("NginxCluster"))
+			Expect(service.OwnerReferences[0].Kind).To(Equal("NginxCluster"))
+
+			By("Verifying status fields and conditions are updated")
+			updated := &platformv1.NginxCluster{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
+			Expect(updated.Status.ReadyReplicas).To(Equal(int32(0)))
+			Expect(meta.FindStatusCondition(updated.Status.Conditions, "Available")).NotTo(BeNil())
+			Expect(meta.FindStatusCondition(updated.Status.Conditions, "Progressing")).NotTo(BeNil())
+			Expect(meta.FindStatusCondition(updated.Status.Conditions, "Degraded")).NotTo(BeNil())
 		})
 	})
 })

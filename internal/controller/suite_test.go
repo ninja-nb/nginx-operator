@@ -103,16 +103,31 @@ var _ = AfterSuite(func() {
 // setting the 'KUBEBUILDER_ASSETS' environment variable. To ensure the binaries are
 // properly set up, run 'make setup-envtest' beforehand.
 func getFirstFoundEnvTestBinaryDir() string {
-	basePath := filepath.Join("..", "..", "bin", "k8s")
-	entries, err := os.ReadDir(basePath)
-	if err != nil {
-		logf.Log.Error(err, "Failed to read directory", "path", basePath)
-		return ""
+	candidates := []string{
+		filepath.Join("..", "..", "bin", "k8s"),
+		filepath.Join("..", "..", "bin"),
+		"/usr/local/kubebuilder/bin",
 	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			return filepath.Join(basePath, entry.Name())
+
+	if localBin := os.Getenv("LOCALBIN"); localBin != "" {
+		candidates = append([]string{localBin, filepath.Join(localBin, "k8s")}, candidates...)
+	}
+
+	for _, basePath := range candidates {
+		entries, err := os.ReadDir(basePath)
+		if err != nil {
+			continue
 		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				return filepath.Join(basePath, entry.Name())
+			}
+		}
+
+		return basePath
 	}
+
+	logf.Log.Info("Could not find envtest binaries in candidate directories", "candidates", candidates)
 	return ""
 }

@@ -26,14 +26,9 @@ import (
 
 // NginxClusterSpec defines the desired state of NginxCluster
 type NginxClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
-
-	// foo is an example field of NginxCluster. Edit nginxcluster_types.go to remove/update
-	// +optional
-	//Foo *string `json:"foo,omitempty"`
+	// replicas is the desired number of nginx pods.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
 	Replicas int32 `json:"replicas"`
 }
 

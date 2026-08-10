@@ -40,11 +40,13 @@ spec:
             description: spec defines the desired state of NginxCluster
             properties:
               replicas:
-                description: |-
-                  foo is an example field of NginxCluster. Edit nginxcluster_types.go to remove/update
-                  Foo *string `json:"foo,omitempty"`
+                default: 1
+                description: replicas is the desired number of nginx pods.
                 format: int32
+                minimum: 1
                 type: integer
+            required:
+            - replicas
             type: object
           status:
             description: status defines the observed state of NginxCluster
