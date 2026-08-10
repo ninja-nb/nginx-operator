@@ -1,0 +1,13 @@
+command,category,creates_or_updates,notes
+kubebuilder init --domain example.com --repo github.com/narendra/nginx-operator,scaffold,"PROJECT; cmd/main.go; Makefile; Dockerfile; config/default/*; config/manager/*; config/rbac/*; config/crd/*; config/samples/*; go.mod; go.sum",Initial project bootstrap (run once per new operator repo)
+kubebuilder create api --group platform --version v1 --kind NginxCluster,scaffold,"api/v1/nginxcluster_types.go; api/v1/groupversion_info.go; internal/controller/nginxcluster_controller.go; internal/controller/nginxcluster_controller_test.go; config/samples/platform_v1_nginxcluster.yaml; cmd/main.go (registration markers)",Scaffolds API + controller stubs and wires them into manager
+make generate,codegen,api/v1/zz_generated.deepcopy.go,Generates DeepCopy helpers from API Go types
+make manifests,codegen,"config/crd/bases/platform.example.com_nginxclusters.yaml; config/rbac/role.yaml; (and webhook manifests if webhooks are configured)",Generates CRD/RBAC/webhook YAML from markers in Go files
+make install,cluster_apply,"(no new repo files); applies config/crd output to cluster",Runs manifests first then applies CRDs with kubectl
+make build,local_build,bin/manager,Builds local manager binary
+make run,local_run,"(no created files expected)",Runs controller locally against current kube-context
+make docker-build IMG=<image>,container_build,Docker image in local image cache,Builds operator image from Dockerfile
+kind load docker-image <image> --name <cluster>,cluster_load,"(no repo files); image loaded into kind nodes",Makes locally built image available to kind cluster
+make deploy IMG=<image>,cluster_apply,"(no new repo files); applies config/default manifests to cluster","Updates image reference in config/manager then deploys via kustomize|kubectl"
+make undeploy,cluster_apply,"(no new repo files); deletes deployed controller resources",Removes operator deployment and related manifests from cluster
+make uninstall,cluster_apply,"(no new repo files); deletes installed CRDs",Removes CRD definitions from cluster

@@ -1,0 +1,10 @@
+apiVersion: platform.example.com/v1
+kind: NginxCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: nginx-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: nginxcluster-sample
+spec:
+  replicas: 2
+
