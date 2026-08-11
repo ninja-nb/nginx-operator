@@ -1,6 +1,6 @@
 # ADR-003: NGINX Operator Design Q&A
 
-This document has all questions with a short answer first, then how to verify.
+This document has all questions with a short answer first, then verification steps.
 
 ### Q1: If a CR spec change takes 10+ minutes to take effect, what all should we look for?
 **Answer:** Treat this as a control-loop latency issue and debug in layers: trigger, controller, child resources, and cluster/runtime.
