@@ -39,7 +39,7 @@ kubectl logs -n nginx-operator-system deployment/nginx-operator-controller-manag
 kubectl get events -n <namespace> --sort-by=.metadata.creationTimestamp
 ```
 
-**Interview design point**
+**Design point**
 - In production, define an SLO (for example, spec-change-to-ready under 10 minutes), expose reconcile latency metrics, and set a timeout condition/event (`ReconcileTimeout`) when the SLO is breached.
 
 ### Q2: What does this operator do?
