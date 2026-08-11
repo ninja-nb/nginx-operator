@@ -15,10 +15,10 @@ For detailed architecture and design documentation, review the GitHub Wiki:
 
 If you want to quickly gauge platform/system design depth, start with the Wiki ADRs:
 
-- [ADR-004 - Nutanix NKP Platform Architecture](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90004-%E2%80%90-Nutanix-NKP-design)
-- [ADR-001 - Fleet Application Deployment Platform (GitOps Pull Model)](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90001-%E2%80%90-Fleet-Application-Deployment-Platform-%E2%80%90-System-Design-Wiki)
-- [ADR-002 - Enterprise AI/ML Infrastructure on Kubernetes](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90002:-Enterprise-AI-ML-Infrastructure-on-Kubernetes)
-- [ADR-003 - NGINX Operator Design Q&A](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90003-%E2%80%90-NGINX-Operator-Design-Q&A)
+- [ADR-004 - Nutanix NKP Platform Architecture](https://github.com/ninja-nb/nginx-operator/wiki/01%20-%20ADR-004%20-%20Nutanix%20NKP%20Design)
+- [ADR-001 - Fleet Application Deployment Platform (GitOps Pull Model)](https://github.com/ninja-nb/nginx-operator/wiki/02%20-%20ADR-001%20-%20Fleet%20Application%20Deployment%20Platform%20-%20System%20Design%20Wiki)
+- [ADR-002 - Enterprise AI/ML Infrastructure on Kubernetes](https://github.com/ninja-nb/nginx-operator/wiki/03%20-%20ADR-002%20-%20Enterprise%20AI%20ML%20Infrastructure%20on%20Kubernetes)
+- [ADR-003 - NGINX Operator Design Q&A](https://github.com/ninja-nb/nginx-operator/wiki/04%20-%20ADR-003%20-%20NGINX%20Operator%20Design%20Q%26A)
 
 Then review implementation depth in this order:
 
