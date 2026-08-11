@@ -1,6 +1,6 @@
-# NGINX Operator Design Q&A 
+# ADR-003: NGINX Operator Design Q&A
 
-This document gas all questions with a short answer first, then how to verify.
+This document has all questions with a short answer first, then how to verify.
 
 ### Q1: If a CR spec change takes 10+ minutes to take effect, what all should we look for?
 **Answer:** Treat this as a control-loop latency issue and debug in layers: trigger, controller, child resources, and cluster/runtime.
@@ -42,7 +42,7 @@ kubectl get events -n <namespace> --sort-by=.metadata.creationTimestamp
 **Interview design point**
 - In production, define an SLO (for example, spec-change-to-ready under 10 minutes), expose reconcile latency metrics, and set a timeout condition/event (`ReconcileTimeout`) when the SLO is breached.
 
-### Q12 What does this operator do?
+### Q2: What does this operator do?
 **Answer:** For each `NginxCluster`, it reconciles one `Deployment` and one `Service` (both with the same name as the CR, in the same namespace).
 
 **How to verify**

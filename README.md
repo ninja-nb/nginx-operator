@@ -12,8 +12,8 @@ The custom resource currently lets you set desired replica count via `spec.repli
 
 If you want to quickly gauge platform/system design depth, start with the Wiki ADRs:
 
-- [ADR-004 - Nutanix NKP Design](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90004-%E2%80%90-Nutanix-NKP-design)
-- [ADR-001 - Fleet Application Deployment Platform](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90001-%E2%80%90-Fleet-Application-Deployment-Platform-%E2%80%90-System-Design-Wiki)
+- [ADR-004 - Nutanix NKP Platform Architecture](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90004-%E2%80%90-Nutanix-NKP-design)
+- [ADR-001 - Fleet Application Deployment Platform (GitOps Pull Model)](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90001-%E2%80%90-Fleet-Application-Deployment-Platform-%E2%80%90-System-Design-Wiki)
 - [ADR-002 - Enterprise AI/ML Infrastructure on Kubernetes](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90002:-Enterprise-AI-ML-Infrastructure-on-Kubernetes)
 - [ADR-003 - NGINX Operator Design Q&A](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90003-%E2%80%90-NGINX-Operator-Design-Q&A)
 
