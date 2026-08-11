@@ -8,7 +8,7 @@ It manages a custom resource named `NginxCluster` (`platform.example.com/v1`) an
 
 The custom resource currently lets you set desired replica count via `spec.replicas`, and the operator reports observed readiness via `status.readyReplicas`.
 
-## Interviewer Quick Scan
+## Quick Scan
 
 If you want to quickly gauge platform/system design depth, start with the Wiki ADRs:
 

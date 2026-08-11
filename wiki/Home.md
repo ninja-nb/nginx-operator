@@ -1,6 +1,7 @@
 # nginx-operator Wiki Home
 
-This folder mirrors the GitHub Wiki content in Git so updates can be reviewed and versioned through normal PR workflow.
+This wiki is the landing page for architecture and implementation review of `nginx-operator`.
+It is organized as ADRs so reviewers can quickly move from platform decisions to actual operator code.
 
 ## ADR Index (Reading Flow)
 
@@ -25,13 +26,20 @@ This folder mirrors the GitHub Wiki content in Git so updates can be reviewed an
 
 ## Actual Operator Implementation
 
-Use these links to review the real implementation in the repository:
+Use these links to review the production-facing code and behavior:
 
 - [Controller Reconcile Logic (`internal/controller/nginxcluster_controller.go`)](https://github.com/ninja-nb/nginx-operator/blob/main/internal/controller/nginxcluster_controller.go)
 - [Controller Tests (`internal/controller/nginxcluster_controller_test.go`)](https://github.com/ninja-nb/nginx-operator/blob/main/internal/controller/nginxcluster_controller_test.go)
 - [CRD API Types (`api/v1/nginxcluster_types.go`)](https://github.com/ninja-nb/nginx-operator/blob/main/api/v1/nginxcluster_types.go)
 - [Sample Custom Resource (`config/samples/platform_v1_nginxcluster.yaml`)](https://github.com/ninja-nb/nginx-operator/blob/main/config/samples/platform_v1_nginxcluster.yaml)
 - [Project README (run/deploy/verify)](https://github.com/ninja-nb/nginx-operator/blob/main/README.md)
+
+## Start Here (Fast Path)
+
+1. Read `ADR-004` for NKP platform architecture context.
+2. Read `ADR-001` for fleet deployment model and rollout safety.
+3. Read `ADR-003` for operator behavior and debugging depth.
+4. Open controller code and tests to validate implementation quality.
 
 ## Sync to GitHub Wiki
 
