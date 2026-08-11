@@ -10,6 +10,9 @@ The custom resource currently lets you set desired replica count via `spec.repli
 
 ## Quick Scan
 
+For detailed architecture and design documentation, review the GitHub Wiki:
+[Wiki Home](https://github.com/ninja-nb/nginx-operator/wiki).
+
 If you want to quickly gauge platform/system design depth, start with the Wiki ADRs:
 
 - [ADR-004 - Nutanix NKP Platform Architecture](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90004-%E2%80%90-Nutanix-NKP-design)
