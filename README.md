@@ -8,6 +8,22 @@ It manages a custom resource named `NginxCluster` (`platform.example.com/v1`) an
 
 The custom resource currently lets you set desired replica count via `spec.replicas`, and the operator reports observed readiness via `status.readyReplicas`.
 
+## Interviewer Quick Scan
+
+If you want to quickly gauge platform/system design depth, start with the Wiki ADRs:
+
+- [ADR-004 - Nutanix NKP Design](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90004-%E2%80%90-Nutanix-NKP-design)
+- [ADR-001 - Fleet Application Deployment Platform](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90001-%E2%80%90-Fleet-Application-Deployment-Platform-%E2%80%90-System-Design-Wiki)
+- [ADR-002 - Enterprise AI/ML Infrastructure on Kubernetes](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90002:-Enterprise-AI-ML-Infrastructure-on-Kubernetes)
+- [ADR-003 - NGINX Operator Design Q&A](https://github.com/ninja-nb/nginx-operator/wiki/ADR%E2%80%90003-%E2%80%90-NGINX-Operator-Design-Q&A)
+
+Then review implementation depth in this order:
+
+1. `internal/controller/nginxcluster_controller.go` (reconciliation behavior)
+2. `internal/controller/nginxcluster_controller_test.go` (test coverage and edge cases)
+3. `api/v1/nginxcluster_types.go` (API design and validation markers)
+4. `config/samples/platform_v1_nginxcluster.yaml` (runtime usage)
+
 ## How It Works
 
 When an `NginxCluster` is created or updated, the controller:
@@ -33,6 +49,12 @@ The controller watches:
 - `config/manager/`: controller manager deployment manifest
 - `config/samples/`: sample custom resources
 - `test/`: unit and e2e tests
+
+## Documentation Placement (Recommended)
+
+- Keep `README.md` as the **entry point**: project purpose, run/deploy commands, and quick links.
+- Keep design narratives and interview/ADR content in the **GitHub Wiki** (best for browseable architecture storytelling).
+- Keep operator implementation notes close to code under `docs/` only when they are code-adjacent and likely to evolve with commits.
 
 ## Prerequisites
 
